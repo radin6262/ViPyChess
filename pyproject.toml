@@ -1,0 +1,4 @@
+[tool.flet]
+assets = [
+    "assets"
+]
