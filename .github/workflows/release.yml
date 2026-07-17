@@ -1,9 +1,13 @@
 name: Release Android APK
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (example: v1.0.0)"
+        required: true
+        type: string
+        default: "v1.0.0"
 
 permissions:
   contents: write
@@ -15,6 +19,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -58,23 +64,43 @@ jobs:
       - name: Locate APK
         run: |
           APK=$(find . -name "*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "APK not found!"
+            exit 1
+          fi
+
           mkdir -p apk
           cp "$APK" apk/ViPyChess.apk
-          echo "APK=$PWD/apk/ViPyChess.apk" >> $GITHUB_ENV
 
-      # Backup artifact
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ViPyChess-${{ github.ref_name }}
+          name: ViPyChess-${{ inputs.version }}
           path: apk/ViPyChess.apk
 
-      # Create Release
+      - name: Create Git Tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch --tags
+
+          if git rev-parse "${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag already exists!"
+            exit 1
+          fi
+
+          git tag "${{ inputs.version }}"
+          git push origin "${{ inputs.version }}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.version }}
+          name: ${{ inputs.version }}
           make_latest: true
           generate_release_notes: true
           files: |
