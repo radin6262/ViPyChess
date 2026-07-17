@@ -1,4 +1,4 @@
-name: Build Windows And Android Testing Artifacts
+name: Build Testing Artifacts
 
 on:
   workflow_dispatch:
