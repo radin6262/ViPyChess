@@ -22,6 +22,7 @@ class LocalMatchPage:
         )
         self.status_text = None
         self.move_count_text = None
+        self.history = None
 
     def show(self):
         """Display the local match page"""
@@ -36,9 +37,9 @@ class LocalMatchPage:
 
         # Player indicators
         player_row = ft.Row([
-            ft.Text("Up - Black", size=14, weight=ft.FontWeight.W_500),
+            ft.Text("⬆ Black", size=14, weight=ft.FontWeight.W_500),
             ft.Container(expand=True),
-            ft.Text("Down - White", size=14, weight=ft.FontWeight.W_500),
+            ft.Text("⬇ White", size=14, weight=ft.FontWeight.W_500),
         ], alignment=ft.MainAxisAlignment.CENTER)
 
         # Status
@@ -48,8 +49,11 @@ class LocalMatchPage:
         self.move_count_text = ft.Text("Move: 1", size=14, color=ft.Colors.GREY_700)
 
         # Board
-        board_container = self.board_ui.create()
+        board_stack = self.board_ui.create()
 
+        # Move history
+        self.history = MoveHistory()
+        history_container = self.history.create()
 
         # Controls
         controls = GameControls(
@@ -64,10 +68,11 @@ class LocalMatchPage:
             self.status_text,
             self.move_count_text,
             ft.Container(height=10),
-            board_container,
+            board_stack,
             ft.Container(height=10),
             controls_row,
             ft.Container(height=10),
+            history_container,
         )
 
         self.page.update()
@@ -93,12 +98,14 @@ class LocalMatchPage:
         full_moves = half_moves // 2 + 1
         self.move_count_text.value = f"Move: {full_moves}"
 
+        self.history.update(board.move_stack)
         self.board_ui.update()
         self.page.update()
 
     def _new_game(self):
         self.game.reset()
         self.board_ui.reset()
+        self.history.clear()
         self._update_ui()
 
     def _go_home(self):

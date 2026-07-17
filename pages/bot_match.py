@@ -1,11 +1,12 @@
 """
 VIChess - Bot Match
-Play against Stockfish AI
+Play against VIChess AI
 Board is fixed: You (White) at bottom, AI (Black) at top
 """
 
 import flet as ft
 import threading
+import asyncio
 import chess
 from lib.chess_board import ChessBoardUI
 from lib.chess_logic import ChessGameLogic
@@ -25,6 +26,7 @@ class BotMatchPage:
         self.status_text = None
         self.move_count_text = None
         self.difficulty_text = None
+        self.history = None
 
         self.is_ai_thinking = False
         self.ai = CustomChessAI(difficulty=2)
@@ -37,7 +39,7 @@ class BotMatchPage:
 
         # Back button
         back_btn = ft.TextButton(
-            "← Back",
+            "< Back",
             on_click=lambda e: self._go_home(),
             style=ft.ButtonStyle(color=ft.Colors.BLUE_700),
         )
@@ -46,7 +48,7 @@ class BotMatchPage:
         player_row = ft.Row([
             ft.Text("Black (AI)", size=14, weight=ft.FontWeight.W_500, color=ft.Colors.RED_700),
             ft.Container(expand=True),
-            ft.Text("⬇You (White)", size=14, weight=ft.FontWeight.W_500, color=ft.Colors.BLUE_700),
+            ft.Text("You (White)", size=14, weight=ft.FontWeight.W_500, color=ft.Colors.BLUE_700),
         ], alignment=ft.MainAxisAlignment.CENTER)
 
         # Status
@@ -55,13 +57,20 @@ class BotMatchPage:
         # Move count + difficulty
         self.move_count_text = ft.Text("Move: 1", size=14, color=ft.Colors.GREY_700)
 
-        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard"}
+        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
         self.difficulty_text = ft.Text(
             f"VIChess AI: {difficulty_names[self.difficulty]}",
+            size=14,
+            color=ft.Colors.BLUE_700,
+            weight=ft.FontWeight.W_500,
         )
 
         # Board
-        board_container = self.board_ui.create()
+        board_stack = self.board_ui.create()
+
+        # Move history
+        self.history = MoveHistory()
+        history_container = self.history.create()
 
         # Controls with difficulty
         controls = GameControls(
@@ -78,24 +87,28 @@ class BotMatchPage:
             self.status_text,
             ft.Row([self.move_count_text, ft.Container(width=20), self.difficulty_text], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=10),
-            board_container,
+            board_stack,
             ft.Container(height=10),
             controls_row,
             ft.Container(height=10),
+            history_container,
         )
 
         self.page.update()
 
     def on_move(self, move: chess.Move):
+        """Called after a move is made (human or AI)"""
         self._update_ui()
 
+        # Trigger AI if it's Black's turn
         if (
-                not self.game.board.is_game_over()
-                and self.game.board.turn == chess.BLACK
+            not self.game.board.is_game_over()
+            and self.game.board.turn == chess.BLACK
         ):
             self._trigger_ai_move()
 
     def _trigger_ai_move(self):
+        """Trigger AI move in background thread"""
         if self.is_ai_thinking:
             return
 
@@ -106,8 +119,9 @@ class BotMatchPage:
         threading.Thread(target=self._ai_worker, daemon=True).start()
 
     def _ai_worker(self):
+        """AI worker thread - computes the best move"""
         try:
-            move = self.ai.choose_move(self.game.board.copy())
+            move = self.ai.choose_move(self.game.board)
             self._pending_ai_move = move
         except Exception as e:
             print("AI error:", e)
@@ -115,18 +129,26 @@ class BotMatchPage:
 
         self.is_ai_thinking = False
 
-        self.page.run_thread(self._check_ai_move)
+        # Schedule the UI update on the main thread
+        try:
+            loop = asyncio.get_event_loop()
+            loop.call_soon_threadsafe(self._check_ai_move)
+        except RuntimeError:
+            # Fallback
+            self.page.update()
+            self._check_ai_move()
 
     def _check_ai_move(self):
+        """Execute the AI move on the main thread using the board's play_move()"""
         if self._pending_ai_move:
             move = self._pending_ai_move
             self._pending_ai_move = None
 
-            self.game.board.push(move)
-            self.board_ui.update()
-            self._update_ui()
+            # Use the board's play_move method - this keeps UI in sync!
+            self.board_ui.play_move(move)
 
     def _update_ui(self):
+        """Update all UI elements"""
         board = self.game.board
 
         if board.is_checkmate():
@@ -138,7 +160,7 @@ class BotMatchPage:
             self.status_text.value = "Draw! Insufficient material."
         else:
             turn = "White" if board.turn == chess.WHITE else "Black"
-            if turn == "Black":
+            if turn == "Black" and self.is_ai_thinking:
                 self.status_text.value = "VIChess AI is thinking..."
             else:
                 self.status_text.value = f"Your turn ({turn})"
@@ -147,10 +169,13 @@ class BotMatchPage:
         full_moves = half_moves // 2 + 1
         self.move_count_text.value = f"Move: {full_moves}"
 
-        self.board_ui.update()
+        if self.history:
+            self.history.update(board.move_stack)
+
         self.page.update()
 
     def _new_game(self):
+        """Reset the game"""
         self.game.reset()
         self.board_ui.reset()
 
@@ -159,16 +184,21 @@ class BotMatchPage:
         self._pending_ai_move = None
         self.is_ai_thinking = False
 
+        if self.history:
+            self.history.clear()
+
         self._update_ui()
 
     def _change_difficulty(self, level: int):
+        """Change AI difficulty"""
         self.difficulty = level
-        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard"}
+        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
         self.ai = CustomChessAI(level)
         self.difficulty_text.value = f"VIChess AI: {difficulty_names[level]}"
         self.difficulty_text.update()
         self._new_game()
 
     def _go_home(self):
+        """Navigate back to home"""
         from pages.home_page import HomePage
         HomePage(self.page).show()

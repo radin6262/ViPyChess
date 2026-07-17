@@ -119,7 +119,7 @@ class MoveHistory:
         self.container = ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("📜 Move History", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text("Move History", size=14, weight=ft.FontWeight.BOLD),
                     self.text_widget,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
