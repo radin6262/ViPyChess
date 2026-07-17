@@ -1,4 +1,4 @@
-name: Release
+name: Build And Release
 
 on:
   workflow_dispatch:
@@ -100,7 +100,11 @@ jobs:
 
       - name: Build Windows App
         shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: |
+          chcp 65001
           flet build windows
 
       - name: Package Windows Build
