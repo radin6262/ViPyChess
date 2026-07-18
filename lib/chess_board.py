@@ -1,6 +1,5 @@
 """
-VIChess - Chess Board UI
-Proper layered architecture with click layer on top
+VIRender Engine - Chess Board UI
 """
 
 import flet as ft
@@ -13,7 +12,7 @@ class ChessBoardUI:
     """
     Stack-based chess board with proper layering:
     - Board Layer (8x8 grid graphics)
-    - Highlight Layer (selection, legal moves, check)
+    - Highlight Layer (selection, legal moves, check, last move)
     - Piece Layer (persistent piece controls)
     - Click Layer (64 transparent click areas - ON TOP)
     - Animation Layer (floating pieces for animations)
@@ -45,6 +44,10 @@ class ChessBoardUI:
         self.board_pieces = []  # List of BoardPiece objects (persistent)
         self.piece_map = {}  # square -> BoardPiece for quick lookup
 
+        # Last move tracking
+        self.last_move_from = None
+        self.last_move_to = None
+
         # Board dimensions
         self.square_size = 0
         self.board_size = 0
@@ -57,6 +60,7 @@ class ChessBoardUI:
         self.selected_color = ft.Colors.YELLOW_400
         self.highlight_color = ft.Colors.GREEN_300
         self.check_color = ft.Colors.RED_300
+        self.last_move_color = ft.Colors.YELLOW_600  # Light yellow for last move
 
         # Layers
         self.board_stack = None
@@ -93,6 +97,8 @@ class ChessBoardUI:
         self.board_pieces.clear()
         self.piece_map.clear()
         self.click_areas.clear()
+        self.last_move_from = None
+        self.last_move_to = None
 
         # Create layers - ORDER MATTERS (bottom to top)
         self.board_layer = self._build_board_layer()
@@ -309,6 +315,12 @@ class ChessBoardUI:
         # Push the move
         self.game.board.push(move)
 
+        # Track last move
+        self.last_move_from = king_from
+        self.last_move_to = king_to
+        # For castling, also highlight rook's destination
+        self.last_move_rook_to = rook_to
+
         # Clear highlights
         self.selected_square = None
         self._clear_highlights()
@@ -320,6 +332,47 @@ class ChessBoardUI:
             self.on_move(move)
 
         print(f"✅ Castling complete")
+
+    async def _animate_piece(self, piece_obj: BoardPiece, to_sq: int):
+        x, y = self.square_to_xy(to_sq)
+
+        # hide the real piece
+        piece_obj.control.visible = False
+        self.piece_layer.update()
+
+        # create animation copy
+        anim = piece_obj.create_animation_copy(
+            self.square_size,
+            self.piece_size,
+        )
+
+        self.animation_layer.controls.append(anim)
+        self.animation_layer.update()
+
+        await asyncio.sleep(0.05)
+
+        # animate copy
+        anim.left = x
+        anim.top = y
+        self.animation_layer.update()
+
+        await asyncio.sleep(self.animation_sleep)
+
+        # remove animation copy
+        self.animation_layer.controls.remove(anim)
+
+        # move real piece instantly
+        piece_obj.update_position(
+            x,
+            y,
+            self.square_size,
+            self.piece_size,
+        )
+
+        piece_obj.control.visible = True
+
+        self.animation_layer.update()
+        self.piece_layer.update()
 
     def _on_clicked_square(self, square: int):
         """Handle click on a square (called from click layer)"""
@@ -387,45 +440,122 @@ class ChessBoardUI:
             self._update_highlights()
 
     async def _animate_and_move(self, from_sq: int, to_sq: int, move: chess.Move):
-        """Animate the move with proper capture handling"""
+        """Animate a move using a temporary sprite in animation_layer."""
         self.animating = True
 
-        # Check if this is a capture
+        moving_piece = self._get_piece_at(from_sq)
+        if moving_piece is None:
+            self.animating = False
+            return
+
+        # -------------------------------
+        # Handle capture
+        # -------------------------------
         captured = self._get_piece_at(to_sq)
         if captured:
             captured.set_opacity(0)
             self.piece_layer.update()
-            await asyncio.sleep(0.12)
+            await asyncio.sleep(0.10)
 
-            # Remove captured piece from layer
             if captured.control in self.piece_layer.controls:
                 self.piece_layer.controls.remove(captured.control)
-                self.piece_layer.update()
 
-            # Remove from map
             if to_sq in self.piece_map:
                 del self.piece_map[to_sq]
+
             captured.is_captured = True
-
-        # Animate the moving piece
-        piece_obj = self._get_piece_at(from_sq)
-        if piece_obj:
-            # Move the piece
-            self._move_piece(from_sq, to_sq)
-            self.piece_layer.update()
-            await asyncio.sleep(self.animation_sleep)
-
-            # Pop effect on landing
-            piece_obj.set_scale(1.2)
-            self.piece_layer.update()
-            await asyncio.sleep(0.08)
-            piece_obj.set_scale(1.0)
             self.piece_layer.update()
 
-        # Make the move in the game logic
+        # -------------------------------
+        # Hide the real moving piece
+        # -------------------------------
+        moving_piece.control.visible = False
+        self.piece_layer.update()
+
+        # -------------------------------
+        # Create temporary animation sprite
+        # -------------------------------
+        from_x, from_y = self.square_to_xy(from_sq)
+
+        anim = ft.Container(
+            width=self.square_size,
+            height=self.square_size,
+            left=from_x,
+            top=from_y,
+            content=ft.Image(
+                src=moving_piece.image_path,
+                width=self.piece_size,
+                height=self.piece_size,
+                fit=ft.BoxFit.CONTAIN,
+            ),
+            animate_position=150,
+        )
+
+        self.animation_layer.controls.append(anim)
+        self.animation_layer.update()
+
+        await asyncio.sleep(0.05)
+
+        # -------------------------------
+        # Animate to destination
+        # -------------------------------
+        to_x, to_y = self.square_to_xy(to_sq)
+
+        anim.left = to_x
+        anim.top = to_y
+
+        self.animation_layer.update()
+
+        await asyncio.sleep(self.animation_sleep)
+
+        # -------------------------------
+        # Remove animation sprite
+        # -------------------------------
+        if anim in self.animation_layer.controls:
+            self.animation_layer.controls.remove(anim)
+
+        self.animation_layer.update()
+
+        # -------------------------------
+        # Move the real piece instantly
+        # -------------------------------
+        if from_sq in self.piece_map:
+            del self.piece_map[from_sq]
+
+        moving_piece.square = to_sq
+
+        moving_piece.update_position(
+            to_x,
+            to_y,
+            self.square_size,
+            self.piece_size,
+        )
+
+        moving_piece.control.visible = True
+
+        self.piece_map[to_sq] = moving_piece
+
+        self.piece_layer.update()
+
+        # -------------------------------
+        # Landing pop
+        # -------------------------------
+        moving_piece.set_scale(1.2)
+        self.piece_layer.update()
+        await asyncio.sleep(0.08)
+
+        moving_piece.set_scale(1.0)
+        self.piece_layer.update()
+
+        # -------------------------------
+        # Update chess state
+        # -------------------------------
         self.game.board.push(move)
 
-        # Clear highlights
+        # Track last move
+        self.last_move_from = from_sq
+        self.last_move_to = to_sq
+
         self.selected_square = None
         self._clear_highlights()
         self._update_highlights()
@@ -467,6 +597,11 @@ class ChessBoardUI:
     def _update_highlights(self):
         """Update square highlights"""
         self._clear_highlights()
+
+        # Highlight last move first (so it's behind selection highlights)
+        if self.last_move_from is not None and self.last_move_to is not None:
+            self._highlight_square(self.last_move_from, self.last_move_color)
+            self._highlight_square(self.last_move_to, self.last_move_color)
 
         if self.selected_square is not None:
             # Highlight selected square
@@ -526,6 +661,8 @@ class ChessBoardUI:
 
         # Reset highlights
         self.selected_square = None
+        self.last_move_from = None
+        self.last_move_to = None
         self._clear_highlights()
 
         # Recreate pieces

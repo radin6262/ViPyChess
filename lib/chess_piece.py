@@ -22,19 +22,34 @@ class BoardPiece:
         # Create the UI control (created once, never recreated)
         # Use ft.Alignment(0, 0) which is the center
         self.control = ft.Container(
-            width=0,  # Will be set when board is sized
-            height=0,  # Will be set when board is sized
-            alignment=ft.Alignment(0, 0),  # Center the image inside
+            width=0,
+            height=0,
+            alignment=ft.Alignment(0, 0),
             content=ft.Image(
                 src=image_path,
                 fit=ft.BoxFit.CONTAIN,
             ),
-            animate_position=150,
-            animate_opacity=ft.Animation(duration=150, curve=ft.AnimationCurve.EASE_IN_OUT),
-            animate_scale=ft.Animation(duration=100, curve=ft.AnimationCurve.EASE_OUT),
             opacity=1.0,
             scale=1.0,
             visible=True,
+        )
+
+    def create_animation_copy(self, square_size: int, piece_size: int) -> ft.Container:
+        """Create a temporary copy used only for movement animation."""
+
+        return ft.Container(
+            width=square_size,
+            height=square_size,
+            left=self.control.left,
+            top=self.control.top,
+            content=ft.Image(
+                src=self.image_path,
+                width=piece_size,
+                height=piece_size,
+                fit=ft.BoxFit.CONTAIN,
+            ),
+            animate_position=150,
+            opacity=1.0,
         )
 
     def update_position(self, x: float, y: float, square_size: int, piece_size: int):

@@ -13,6 +13,8 @@ VIChess is an open-source chess application built with Python and Flet, providin
   * Pawn promotion
 * Cross-platform support through Flet
 
+## Versioning Scheme
+- Versioning Scheme: VIRender.VIUI
 ## Installation
 
 ```bash

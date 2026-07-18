@@ -107,7 +107,7 @@ class HomePage:
                     ft.Container(height=35),
 
                     ft.Text(
-                        "UI Version 1.2 • ViRender 1.0",
+                        "VIUI 1.2 • VIRender 1.1",
                         size=12,
                         color=ft.Colors.GREY_500,
                     ),
