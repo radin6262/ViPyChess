@@ -16,6 +16,7 @@ class ChessBoardUI:
     - Piece Layer (persistent piece controls)
     - Click Layer (64 transparent click areas - ON TOP)
     - Animation Layer (floating pieces for animations)
+    - Promotion Layer (pawn promotion picker)
     """
 
     PIECE_IMAGES = {
@@ -60,7 +61,7 @@ class ChessBoardUI:
         self.selected_color = ft.Colors.YELLOW_400
         self.highlight_color = ft.Colors.GREEN_300
         self.check_color = ft.Colors.RED_300
-        self.last_move_color = ft.Colors.YELLOW_600  # Light yellow for last move
+        self.last_move_color = ft.Colors.YELLOW_600
 
         # Layers
         self.board_stack = None
@@ -69,11 +70,16 @@ class ChessBoardUI:
         self.highlight_layer = None
         self.piece_layer = None
         self.animation_layer = None
+        self.promotion_layer = None
         self.click_areas = []  # Store click area references
 
         # Animation settings
         self.animation_duration = 150
         self.animation_sleep = 0.17
+
+        # Promotion vars
+        self.pending_promotion_from = None
+        self.pending_promotion_to = None
 
     def square_to_xy(self, square: int) -> tuple:
         """Convert square to pixel coordinates (top-left of square)"""
@@ -110,13 +116,17 @@ class ChessBoardUI:
             width=self.board_size,
             height=self.board_size,
         )
-        self.click_layer = self._build_click_layer()  # Click layer on top of pieces!
+        self.click_layer = self._build_click_layer()
         self.animation_layer = ft.Stack(
             width=self.board_size,
             height=self.board_size,
         )
+        self.promotion_layer = ft.Stack(
+            width=self.board_size,
+            height=self.board_size,
+        )
 
-        # Main stack - click layer is near the top so it captures everything
+        # Main stack - promotion layer is the topmost
         self.board_stack = ft.Stack(
             width=self.board_size + self.padding * 2,
             height=self.board_size + self.padding * 2,
@@ -124,8 +134,9 @@ class ChessBoardUI:
                 self.board_layer,
                 self.highlight_layer,
                 self.piece_layer,
-                self.click_layer,  # Click layer is ABOVE pieces
-                self.animation_layer,  # Animations on top of everything
+                self.click_layer,
+                self.animation_layer,
+                self.promotion_layer,
             ],
         )
 
@@ -281,9 +292,6 @@ class ChessBoardUI:
         """Animate castling and push the move"""
         self.animating = True
 
-        print(f"🏰 Castling: King {chess.square_name(king_from)} -> {chess.square_name(king_to)}")
-        print(f"   Rook {chess.square_name(rook_from)} -> {chess.square_name(rook_to)}")
-
         # Move king first
         king_obj = self._get_piece_at(king_from)
         if king_obj:
@@ -318,8 +326,6 @@ class ChessBoardUI:
         # Track last move
         self.last_move_from = king_from
         self.last_move_to = king_to
-        # For castling, also highlight rook's destination
-        self.last_move_rook_to = rook_to
 
         # Clear highlights
         self.selected_square = None
@@ -331,52 +337,13 @@ class ChessBoardUI:
         if self.on_move:
             self.on_move(move)
 
-        print(f"✅ Castling complete")
-
-    async def _animate_piece(self, piece_obj: BoardPiece, to_sq: int):
-        x, y = self.square_to_xy(to_sq)
-
-        # hide the real piece
-        piece_obj.control.visible = False
-        self.piece_layer.update()
-
-        # create animation copy
-        anim = piece_obj.create_animation_copy(
-            self.square_size,
-            self.piece_size,
-        )
-
-        self.animation_layer.controls.append(anim)
-        self.animation_layer.update()
-
-        await asyncio.sleep(0.05)
-
-        # animate copy
-        anim.left = x
-        anim.top = y
-        self.animation_layer.update()
-
-        await asyncio.sleep(self.animation_sleep)
-
-        # remove animation copy
-        self.animation_layer.controls.remove(anim)
-
-        # move real piece instantly
-        piece_obj.update_position(
-            x,
-            y,
-            self.square_size,
-            self.piece_size,
-        )
-
-        piece_obj.control.visible = True
-
-        self.animation_layer.update()
-        self.piece_layer.update()
-
     def _on_clicked_square(self, square: int):
         """Handle click on a square (called from click layer)"""
         if self.game.is_game_over() or self.animating:
+            return
+
+        # Check if promotion picker is active
+        if self.pending_promotion_from is not None:
             return
 
         piece = self.game.get_piece_at(square)
@@ -407,22 +374,20 @@ class ChessBoardUI:
             and moving.piece_type == chess.PAWN
             and chess.square_rank(square) in (0, 7)
         ):
-            move = chess.Move(
-                self.selected_square,
-                square,
-                promotion=chess.QUEEN,
-            )
+            self.pending_promotion_from = self.selected_square
+            self.pending_promotion_to = square
+            self._show_promotion_overlay()
+            return
 
         if move in self.game.board.legal_moves:
             from_sq = self.selected_square
             self.selected_square = None
 
-            # Check if this is a castling move using python-chess
+            # Check if this is a castling move
             if self.game.board.is_castling(move):
                 rook_move = self._get_castling_rook_move(from_sq, square)
                 if rook_move:
                     rook_from, rook_to = rook_move
-                    # Animate castling and push move in one coroutine
                     self.page.run_task(
                         self._animate_castling_and_push,
                         from_sq,
@@ -438,6 +403,100 @@ class ChessBoardUI:
         else:
             self.selected_square = None
             self._update_highlights()
+
+    def _show_promotion_overlay(self):
+        """Show promotion picker overlay on the board (Lichess style)"""
+        self.promotion_layer.controls.clear()
+
+        is_white = self.game.board.turn == chess.WHITE
+        promotion_square = self.pending_promotion_to
+        file = chess.square_file(promotion_square)
+
+        square_px = self.square_size
+        x = file * square_px
+
+        # Piece order: Queen, Rook, Bishop, Knight
+        pieces = [
+            ("q", chess.QUEEN),
+            ("r", chess.ROOK),
+            ("b", chess.BISHOP),
+            ("n", chess.KNIGHT),
+        ]
+
+        # White promotes upward, Black promotes downward
+        if is_white:
+            # White: picker starts at top of the file (rank 7)
+            start_y = 0
+            order = pieces
+        else:
+            # Black: picker starts at bottom of the file (rank 0)
+            start_y = self.board_size - square_px * 4
+            order = list(reversed(pieces))
+
+        picker_controls = []
+
+        for i, (symbol, piece_type) in enumerate(order):
+            img = f"pieces/{'w' if is_white else 'b'}{symbol}.svg"
+
+            picker_controls.append(
+                ft.Container(
+                    width=square_px,
+                    height=square_px,
+                    bgcolor=ft.Colors.WHITE,
+                    border=ft.border.Border(
+                        left=ft.border.BorderSide(1, ft.Colors.GREY_400),
+                        right=ft.border.BorderSide(1, ft.Colors.GREY_400),
+                        top=ft.border.BorderSide(1, ft.Colors.GREY_400),
+                        bottom=ft.border.BorderSide(1, ft.Colors.GREY_400),
+                    ),
+                    on_click=lambda e, p=piece_type: self._finish_promotion(p),
+                    content=ft.Image(
+                        src=img,
+                        width=self.piece_size,
+                        height=self.piece_size,
+                        fit=ft.BoxFit.CONTAIN,
+                    ),
+                )
+            )
+
+        picker_column = ft.Column(
+            spacing=0,
+            controls=picker_controls,
+        )
+
+        self.promotion_layer.controls.append(
+            ft.Container(
+                left=x,
+                top=start_y,
+                content=picker_column,
+            )
+        )
+
+        self.promotion_layer.update()
+
+    def _finish_promotion(self, promotion_piece: int):
+        """Complete the promotion and make the move"""
+        # Clear promotion overlay
+        self.promotion_layer.controls.clear()
+        self.promotion_layer.update()
+
+        move = chess.Move(
+            self.pending_promotion_from,
+            self.pending_promotion_to,
+            promotion=promotion_piece,
+        )
+
+        self.pending_promotion_from = None
+        self.pending_promotion_to = None
+
+        self.selected_square = None
+
+        self.page.run_task(
+            self._animate_and_move,
+            move.from_square,
+            move.to_square,
+            move,
+        )
 
     async def _animate_and_move(self, from_sq: int, to_sq: int, move: chess.Move):
         """Animate a move using a temporary sprite in animation_layer."""
@@ -552,6 +611,16 @@ class ChessBoardUI:
         # -------------------------------
         self.game.board.push(move)
 
+        # Update promoted piece sprite
+        if move.promotion:
+            promoted_piece = self.game.board.piece_at(to_sq)
+            if promoted_piece:
+                moving_piece.piece = promoted_piece
+                moving_piece.image_path = self.PIECE_IMAGES[promoted_piece.symbol()]
+                # Update the image source
+                moving_piece.control.content.src = moving_piece.image_path
+                moving_piece.control.content.update()
+
         # Track last move
         self.last_move_from = from_sq
         self.last_move_to = to_sq
@@ -659,11 +728,18 @@ class ChessBoardUI:
         # Clear animation layer
         self.animation_layer.controls.clear()
 
+        # Clear promotion layer
+        self.promotion_layer.controls.clear()
+
         # Reset highlights
         self.selected_square = None
         self.last_move_from = None
         self.last_move_to = None
         self._clear_highlights()
+
+        # Reset promotion state
+        self.pending_promotion_from = None
+        self.pending_promotion_to = None
 
         # Recreate pieces
         self._create_all_pieces()
@@ -671,6 +747,7 @@ class ChessBoardUI:
         self.animating = False
         self.piece_layer.update()
         self.highlight_layer.update()
+        self.promotion_layer.update()
 
     def set_piece_images(self, image_paths: dict):
         """Override default piece images"""

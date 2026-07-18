@@ -1,5 +1,5 @@
 ﻿"""
-VIChess - Chess Piece Class
+VIRender Engine - Chess Piece Class
 Persistent piece objects with identity
 """
 

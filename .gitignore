@@ -1,3 +1,5 @@
 .venv/
 .flet/
 build/
+__PyCache__/
+*.pyc
