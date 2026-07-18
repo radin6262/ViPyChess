@@ -1,4 +1,5 @@
 [tool.flet]
+product = "VIChess"
 assets = [
     "assets"
 ]
