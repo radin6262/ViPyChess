@@ -108,9 +108,15 @@ class BotMatchPage:
         self.page.add(content)
         self.page.update()
 
+        # Initially enable interaction
+        self.board_ui.set_interactive(True)
+
     def on_move(self, move: chess.Move):
         """Called after a move is made (human or AI)"""
         self._update_ui()
+
+        # Re-enable board interaction (in case it was disabled)
+        self.board_ui.set_interactive(True)
 
         board = self.game.board
         if board.is_game_over():
@@ -131,6 +137,9 @@ class BotMatchPage:
 
         self.is_ai_thinking = True
         self.status_text.value = "VIChess AI is thinking..."
+
+        # DISABLE board interaction during AI thinking
+        self.board_ui.set_interactive(False)
         self.page.update()
 
         threading.Thread(target=self._ai_worker, daemon=True).start()
@@ -163,6 +172,9 @@ class BotMatchPage:
 
             # Use the board's play_move method - this keeps UI in sync!
             self.board_ui.play_move(move)
+
+            # Re-enable board interaction after AI move
+            self.board_ui.set_interactive(True)
 
     def _update_ui(self):
         """Update all UI elements"""
@@ -344,6 +356,9 @@ class BotMatchPage:
 
         if self.history:
             self.history.clear()
+
+        # Re-enable board interaction
+        self.board_ui.set_interactive(True)
 
         self._update_ui()
 

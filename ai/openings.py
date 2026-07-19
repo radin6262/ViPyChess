@@ -13,6 +13,9 @@ OPENINGS = {
         "g1f3",  # White: Nf3
         "b8c6",  # Black: Nc6
         "f1c4",  # White: Bc4
+        "f8c5",  # Black: Bc5
+        "d2d3",  # White: d3
+        "d7d6",  # Black: d6
     ],
     "sicilian": [
         "e2e4",  # White: e4
@@ -22,6 +25,9 @@ OPENINGS = {
         "d2d4",  # White: d4
         "c5d4",  # Black: cxd4
         "f3d4",  # White: Nxd4
+        "g8f6",  # Black: Nf6
+        "b1c3",  # White: Nc3
+        "e7e6",  # Black: e6
     ],
     "queens_gambit": [
         "d2d4",  # White: d4
@@ -30,6 +36,8 @@ OPENINGS = {
         "e7e6",  # Black: e6
         "b1c3",  # White: Nc3
         "g8f6",  # Black: Nf6
+        "c1g5",  # White: Bg5
+        "f8e7",  # Black: Be7
     ],
     "kings_indian": [
         "d2d4",  # White: d4
@@ -38,6 +46,10 @@ OPENINGS = {
         "g7g6",  # Black: g6
         "b1c3",  # White: Nc3
         "f8g7",  # Black: Bg7
+        "e2e4",  # White: e4
+        "d7d6",  # Black: d6
+        "g1f3",  # White: Nf3
+        "e7e5",  # Black: e5
     ],
     "french": [
         "e2e4",  # White: e4
@@ -46,6 +58,10 @@ OPENINGS = {
         "d7d5",  # Black: d5
         "b1c3",  # White: Nc3
         "g8f6",  # Black: Nf6
+        "c1g5",  # White: Bg5
+        "f8e7",  # Black: Be7
+        "e4e5",  # White: e5
+        "f6d7",  # Black: Nfd7
     ],
     "caro_kann": [
         "e2e4",  # White: e4
@@ -54,6 +70,22 @@ OPENINGS = {
         "d7d5",  # Black: d5
         "b1c3",  # White: Nc3
         "d5e4",  # Black: dxe4
+        "c3e4",  # White: Nxe4
+        "c8f5",  # Black: Bf5
+        "g1f3",  # White: Nf3
+        "e7e6",  # Black: e6
+    ],
+    "ruy_lopez": [
+        "e2e4",  # White: e4
+        "e7e5",  # Black: e5
+        "g1f3",  # White: Nf3
+        "b8c6",  # Black: Nc6
+        "f1b5",  # White: Bb5
+        "a7a6",  # Black: a6
+        "b5a4",  # White: Ba4
+        "g8f6",  # Black: Nf6
+        "e1g1",  # White: O-O
+        "f8e7",  # Black: Be7
     ],
 }
 
@@ -72,15 +104,12 @@ def get_opening_move(board: chess.Board) -> chess.Move | None:
     ply_count = len(board.move_stack)
 
     # Only use opening book for first 10 moves
-    if ply_count >= 10:
+    if ply_count >= 12:
         return None
 
-    # For now, try all openings
-    # In a full implementation, you'd track which opening is being played
+    # Try all openings
     for opening_name, moves in OPENINGS.items():
-        # Check if the current position matches this opening
         if ply_count < len(moves):
-            # Check if the moves played so far match this opening
             match = True
             for i in range(ply_count):
                 if board.move_stack[i].uci() != moves[i]:
@@ -88,7 +117,6 @@ def get_opening_move(board: chess.Board) -> chess.Move | None:
                     break
 
             if match:
-                # Return the next move in the opening
                 next_move_uci = moves[ply_count]
                 try:
                     return chess.Move.from_uci(next_move_uci)

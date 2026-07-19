@@ -753,3 +753,15 @@ class ChessBoardUI:
         """Override default piece images"""
         self.PIECE_IMAGES.update(image_paths)
         self.reset()
+
+    def set_interactive(self, enabled: bool):
+        """Enable or disable user interaction with the board"""
+        for click_area in self.click_areas:
+            click_area.visible = enabled
+            click_area.disabled = not enabled
+
+    def is_interactive(self) -> bool:
+        """Check if the board is interactive"""
+        if self.click_areas:
+            return not self.click_areas[0].disabled
+        return True
