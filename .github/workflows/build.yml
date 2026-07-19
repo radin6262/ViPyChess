@@ -55,26 +55,30 @@ jobs:
       # Android
       ###############################################################
 
-      - name: Build Android APK
+      - name: Build Android APKs
         shell: pwsh
         env:
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
         run: |
           chcp 65001
-          flet build apk
+          flet build apk --split-per-abi
 
-      - name: Collect APK
+      - name: Collect ARM64 APK
         shell: pwsh
         run: |
-          $apk = Get-ChildItem -Recurse -Filter *.apk | Select-Object -First 1
+          New-Item -ItemType Directory -Force release | Out-Null
+
+          $apk = Get-ChildItem -Recurse -Filter "*arm64-v8a*.apk" | Select-Object -First 1
 
           if ($null -eq $apk) {
-            throw "APK not found!"
+            throw "arm64-v8a APK not found!"
           }
 
-          New-Item -ItemType Directory -Force release | Out-Null
-          Copy-Item $apk.FullName release\ViPyChess.apk
+          Copy-Item $apk.FullName "release/ViPyChess.apk"
+
+          Write-Host "Collected:"
+          Get-ChildItem release\*.apk
 
       ###############################################################
       # Windows
