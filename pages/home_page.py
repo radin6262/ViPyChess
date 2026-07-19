@@ -119,7 +119,7 @@ class HomePage:
                     ft.Container(height=50),
 
                     ft.Text(
-                        "v3.0 • Using VIRender and VIUI",
+                        "v3.1 - Nerd Tactics • Utilizing VIRender and VIUI",
                         size=13,
                         color=ft.Colors.GREY_500,
                     ),
