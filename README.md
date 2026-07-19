@@ -55,7 +55,21 @@ Examples:
 
 > Prior to version 3.0, internal builds were versioned using the `VIUI.VIRender` format.
 
-## Installation
+## Platform Support
+
+Starting with **VIChess 3.0**, official Android builds are provided **only for ARM64 (`arm64-v8a`) devices**.
+
+This decision reduces APK size, improves performance, and reflects the fact that the vast majority of modern Android devices use 64-bit ARM processors.
+
+The following architectures are **no longer officially supported**:
+
+- `armeabi-v7a` (32-bit ARM)
+- `x86_64` (Android emulators and select desktop environments)
+
+If you require support for these architectures, you can build VIChess yourself from source using Flet's target architecture options.
+
+
+## Installation From Source
 
 Clone the repository:
 
