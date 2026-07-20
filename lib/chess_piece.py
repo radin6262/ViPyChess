@@ -93,3 +93,6 @@ class BoardPiece:
     def get_piece_type(self) -> int:
         """Get the piece type"""
         return self.piece.piece_type
+
+    def set_rotation(self, degrees: int):
+        self.control.rotate = degrees * 3.1415926535 / 180

@@ -5,6 +5,7 @@ VIRender Engine - Chess Board UI
 import flet as ft
 import chess
 import asyncio
+import math
 from lib.chess_piece import BoardPiece
 
 
@@ -81,7 +82,7 @@ class ChessBoardUI:
         self.pending_promotion_from = None
         self.pending_promotion_to = None
 
-    def square_to_xy(self, square: int) -> tuple:
+    def square_to_xy(self, square: int) -> tuple[int, int]:
         """Convert square to pixel coordinates (top-left of square)"""
         file = chess.square_file(square)
         rank = 7 - chess.square_rank(square)
@@ -215,7 +216,7 @@ class ChessBoardUI:
                 self._create_piece(square, piece)
 
     def _create_piece(self, square: int, piece: chess.Piece):
-        """Create a persistent piece object (no click handler needed)"""
+        """Create a persistent piece object with permanent rotation"""
         symbol = piece.symbol()
         image_path = self.PIECE_IMAGES.get(symbol, "")
         x, y = self.square_to_xy(square)
@@ -230,6 +231,10 @@ class ChessBoardUI:
             self.square_size,
             self.piece_size,
         )
+
+        # PERMANENT ROTATION: Black pieces always face Black player
+        if piece.color == chess.BLACK:
+            board_piece.control.rotate = ft.Rotate(angle=math.pi)
 
         # IMPORTANT: Disable click on piece so click layer handles it
         board_piece.control.on_click = None
@@ -264,6 +269,7 @@ class ChessBoardUI:
             self.piece_size,
         )
 
+        # Rotation stays the same (black pieces stay rotated)
         # Add to new square
         self.piece_map[to_sq] = piece_obj
 
@@ -437,6 +443,8 @@ class ChessBoardUI:
 
         for i, (symbol, piece_type) in enumerate(order):
             img = f"pieces/{'w' if is_white else 'b'}{symbol}.svg"
+            # Promotion pieces should face the same way as the player
+            rotation = math.pi if not is_white else 0
 
             picker_controls.append(
                 ft.Container(
@@ -536,11 +544,15 @@ class ChessBoardUI:
         # -------------------------------
         from_x, from_y = self.square_to_xy(from_sq)
 
+        # Copy rotation from the moving piece (black pieces stay rotated)
+        rotation = moving_piece.control.rotate
+
         anim = ft.Container(
             width=self.square_size,
             height=self.square_size,
             left=from_x,
             top=from_y,
+            rotate=rotation,  # Copy rotation
             content=ft.Image(
                 src=moving_piece.image_path,
                 width=self.piece_size,
