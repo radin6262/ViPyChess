@@ -22,7 +22,6 @@ class LocalMatchPage:
         )
         self.move_count_text = None
         self.status_text = None
-        self.history = None
 
     def show(self):
         """Display the local match page"""
@@ -174,7 +173,6 @@ class LocalMatchPage:
             full_moves = half_moves // 2 + 1
             self.move_count_text.value = f"Move {full_moves}"
 
-        self.history.update(board.move_stack)
         self.board_ui.update()
         self.page.update()
 
@@ -344,7 +342,6 @@ class LocalMatchPage:
         """Reset the game"""
         self.game.reset()
         self.board_ui.reset()
-        self.history.clear()
         self.board_ui.set_interactive(True)
         self._update_ui()
 
