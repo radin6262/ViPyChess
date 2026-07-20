@@ -1,7 +1,6 @@
 """
 VIChess - Bot Match
 Play against VIChess AI
-Board is fixed: You (White) at bottom, AI (Black) at top
 """
 
 import flet as ft
@@ -10,7 +9,7 @@ import asyncio
 import chess
 from lib.chess_board import ChessBoardUI
 from lib.chess_logic import ChessGameLogic
-from lib.widgets import GameControls, MoveHistory
+from lib.widgets import MoveHistory
 from ai import CustomChessAI
 
 
@@ -23,10 +22,12 @@ class BotMatchPage:
             self.game,
             on_move=self.on_move,
         )
-        self.status_text = None
         self.move_count_text = None
         self.difficulty_text = None
         self.history = None
+        self.spinner_container = None
+        self.player_indicator = None
+        self.difficulty_buttons = {}
 
         self.is_ai_thinking = False
         self.ai = CustomChessAI(difficulty=2)
@@ -37,29 +38,57 @@ class BotMatchPage:
         """Display the bot match page"""
         self.page.controls.clear()
 
-        # Back button
-        back_btn = ft.TextButton(
-            "< Back",
-            on_click=lambda e: self._go_home(),
-            style=ft.ButtonStyle(color=ft.Colors.BLUE_700),
+        # Header: Player indicator with spinner
+        self.spinner_container = ft.Container(
+            content=ft.ProgressRing(
+                width=20,
+                height=20,
+                stroke_width=2,
+            ),
+            visible=False,
         )
 
-        # Player indicators
-        player_row = ft.Row([
-            ft.Text("Black (AI)", size=14, weight=ft.FontWeight.W_500, color=ft.Colors.RED_700),
-            ft.Container(expand=True),
-            ft.Text("You (White)", size=14, weight=ft.FontWeight.W_500, color=ft.Colors.BLUE_700),
-        ], alignment=ft.MainAxisAlignment.CENTER)
+        title = ft.Row(
+            [
+                ft.Text(
+                    "You (White)",
+                    size=16,
+                    weight=ft.FontWeight.W_500,
+                    color=ft.Colors.BLUE_700,
+                ),
+                ft.Text(" vs ", size=14, color=ft.Colors.GREY_600),
+                ft.Text(
+                    "AI (Black)",
+                    size=16,
+                    weight=ft.FontWeight.W_500,
+                    color=ft.Colors.RED_700,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=4,
+        )
 
-        # Status
-        self.status_text = ft.Text("Your turn (White)", size=20, weight=ft.FontWeight.W_600)
+        self.player_indicator = ft.Stack(
+            width=self.board_ui.board_size,  # or any fixed width
+            controls=[
+                ft.Container(
+                    content=title,
+                    alignment=ft.Alignment(0, 0),
+                ),
+                ft.Container(
+                    content=self.spinner_container,
+                    alignment=ft.Alignment(1, 0),
+                    right=0,
+                ),
+            ],
+        )
 
-        # Move count + difficulty
-        self.move_count_text = ft.Text("Move: 1", size=14, color=ft.Colors.GREY_700)
+        # Move count + difficulty (no status text)
+        self.move_count_text = ft.Text("Move 1", size=14, color=ft.Colors.GREY_600)
 
         difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
         self.difficulty_text = ft.Text(
-            f"VIChess AI: {difficulty_names[self.difficulty]}",
+            f"AI: {difficulty_names[self.difficulty]}",
             size=14,
             color=ft.Colors.BLUE_700,
             weight=ft.FontWeight.W_500,
@@ -68,38 +97,120 @@ class BotMatchPage:
         # Board
         board_stack = self.board_ui.create()
 
-        # Move history
-        self.history = MoveHistory()
-        history_container = self.history.create()
+        difficulty_icons = {
+            1: "icons/feather.svg",
+            2: "icons/crosshair.svg",
+            3: "icons/shield.svg",
+            4: "icons/cpu.svg",
+        }
 
-        # Controls with difficulty
-        controls = GameControls(
-            on_new_game=self._new_game,
-            show_difficulty=True,
-            on_difficulty_change=self._change_difficulty,
+        # Difficulty buttons
+        self.difficulty_buttons = {}
+        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
+
+        difficulty_buttons_row = ft.Row(
+            [],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=5,
+            wrap=True,
         )
-        controls_row = controls.create()
 
-        # Layout - wrap everything in a column
+        for level in [1, 2, 3, 4]:
+            btn = ft.Button(
+                content=ft.Row(
+                    [
+                        ft.Image(
+                            src=difficulty_icons[level],
+                            width=18,
+                            height=18,
+                        ),
+                        ft.Text(difficulty_names[level]),
+                    ],
+                    spacing=6,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                on_click=lambda e, l=level: self._change_difficulty(l),
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=10),
+                    bgcolor=ft.Colors.BLUE_100 if self.difficulty == level else None,
+                ),
+            )
+
+            self.difficulty_buttons[level] = btn
+            difficulty_buttons_row.controls.append(btn)
+
+        # Controls row: New Game, Menu
+        controls_row = ft.Row(
+            [
+                ft.Button(
+                    content=ft.Row(
+                        [
+                            ft.Image(
+                                src="icons/refresh-cw.svg",
+                                width=18,
+                                height=18,
+                            ),
+                            ft.Text("New Game"),
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    on_click=lambda e: self._new_game(),
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                        bgcolor=ft.Colors.BLUE_100,
+                    ),
+                ),
+                ft.Button(
+                    content=ft.Row(
+                        [
+                            ft.Image(
+                                src="icons/home.svg",
+                                width=18,
+                                height=18,
+                            ),
+                            ft.Text("Menu"),
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    on_click=lambda e: self._go_home(),
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                        bgcolor=ft.Colors.GREY_200,
+                    ),
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=10,
+        )
+
+        # Main layout
         content_column = ft.Column(
             [
-                ft.Row([back_btn], alignment=ft.MainAxisAlignment.START),
-                player_row,
-                self.status_text,
-                ft.Row([self.move_count_text, ft.Container(width=20), self.difficulty_text], alignment=ft.MainAxisAlignment.CENTER),
+                self.player_indicator,
+                ft.Row([
+                    self.move_count_text,
+                    ft.Container(width=20),
+                    self.difficulty_text,
+                ], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Container(height=10),
                 board_stack,
                 ft.Container(height=10),
+                difficulty_buttons_row,
+                ft.Container(height=5),
                 controls_row,
                 ft.Container(height=10),
-                history_container,
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=5,
             scroll=ft.ScrollMode.AUTO,
         )
 
-        # Wrap in container with padding - NO expand=True
+        # Wrap in container with padding
         content = ft.Container(
             content=content_column,
             padding=ft.Padding(top=15),
@@ -111,11 +222,20 @@ class BotMatchPage:
         # Initially enable interaction
         self.board_ui.set_interactive(True)
 
+    def _refresh_difficulty_buttons(self):
+        """Update difficulty button styles"""
+        for level, btn in self.difficulty_buttons.items():
+            btn.style = ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=10),
+                bgcolor=ft.Colors.BLUE_100 if level == self.difficulty else None,
+            )
+        self.page.update()
+
     def on_move(self, move: chess.Move):
         """Called after a move is made (human or AI)"""
         self._update_ui()
 
-        # Re-enable board interaction (in case it was disabled)
+        # Re-enable board interaction
         self.board_ui.set_interactive(True)
 
         board = self.game.board
@@ -136,11 +256,9 @@ class BotMatchPage:
             return
 
         self.is_ai_thinking = True
-        self.status_text.value = "VIChess AI is thinking..."
-
-        # DISABLE board interaction during AI thinking
+        self.spinner_container.visible = True
         self.board_ui.set_interactive(False)
-        self.page.update()
+        self.page.update()  # Repaint FIRST before thread starts
 
         threading.Thread(target=self._ai_worker, daemon=True).start()
 
@@ -165,16 +283,17 @@ class BotMatchPage:
             self._check_ai_move()
 
     def _check_ai_move(self):
-        """Execute the AI move on the main thread using the board's play_move()"""
+        """Execute the AI move on the main thread"""
         if self._pending_ai_move:
             move = self._pending_ai_move
             self._pending_ai_move = None
 
-            # Use the board's play_move method - this keeps UI in sync!
             self.board_ui.play_move(move)
-
-            # Re-enable board interaction after AI move
             self.board_ui.set_interactive(True)
+
+        # Hide spinner after AI move completes
+        self.spinner_container.visible = False
+        self.page.update()
 
     def _update_ui(self):
         """Update all UI elements"""
@@ -182,25 +301,24 @@ class BotMatchPage:
 
         if board.is_checkmate():
             winner = "Black" if board.turn == chess.WHITE else "White"
-            self.status_text.value = f"Checkmate! {winner} wins!"
+            self.move_count_text.value = f"Checkmate! {winner} wins!"
+            self.spinner_container.visible = False
         elif board.is_stalemate():
-            self.status_text.value = "Stalemate! It's a draw!"
+            self.move_count_text.value = "Stalemate! It's a draw!"
+            self.spinner_container.visible = False
         elif board.is_insufficient_material():
-            self.status_text.value = "Draw! Insufficient material."
+            self.move_count_text.value = "Draw! Insufficient material."
+            self.spinner_container.visible = False
         elif board.can_claim_threefold_repetition():
-            self.status_text.value = "Draw! Threefold repetition."
+            self.move_count_text.value = "Draw! Threefold repetition."
+            self.spinner_container.visible = False
         elif board.can_claim_fifty_moves():
-            self.status_text.value = "Draw! 50-move rule."
+            self.move_count_text.value = "Draw! 50-move rule."
+            self.spinner_container.visible = False
         else:
-            turn = "White" if board.turn == chess.WHITE else "Black"
-            if turn == "Black" and self.is_ai_thinking:
-                self.status_text.value = "VIChess AI is thinking..."
-            else:
-                self.status_text.value = f"Your turn ({turn})"
-
-        half_moves = len(board.move_stack)
-        full_moves = half_moves // 2 + 1
-        self.move_count_text.value = f"Move: {full_moves}"
+            half_moves = len(board.move_stack)
+            full_moves = half_moves // 2 + 1
+            self.move_count_text.value = f"Move {full_moves}"
 
         if self.history:
             self.history.update(board.move_stack)
@@ -277,11 +395,9 @@ class BotMatchPage:
         else:
             return
 
-        # Get move count
         half_moves = len(board.move_stack)
         full_moves = half_moves // 2 + 1
 
-        # Build the dialog content
         dialog_content = ft.Column([
             icon,
             ft.Container(height=10),
@@ -305,16 +421,16 @@ class BotMatchPage:
             ),
             ft.Container(height=15),
             ft.Row([
-                ft.ElevatedButton(
-                    "New Game",
+                ft.Button(
+                    content=ft.Text("New Game"),
                     on_click=lambda e: self._close_dialog_and_new_game(),
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
                         bgcolor=ft.Colors.BLUE_100,
                     ),
                 ),
-                ft.ElevatedButton(
-                    "Close",
+                ft.Button(
+                    content=ft.Text("Close"),
                     on_click=lambda e: self._close_dialog(),
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
@@ -324,7 +440,6 @@ class BotMatchPage:
             ], alignment=ft.MainAxisAlignment.CENTER, spacing=10),
         ])
 
-        # Create and show the dialog using show_dialog
         dialog = ft.AlertDialog(
             modal=True,
             content=dialog_content,
@@ -357,18 +472,21 @@ class BotMatchPage:
         if self.history:
             self.history.clear()
 
-        # Re-enable board interaction
         self.board_ui.set_interactive(True)
-
+        self.spinner_container.visible = False
+        self._refresh_difficulty_buttons()
         self._update_ui()
 
     def _change_difficulty(self, level: int):
         """Change AI difficulty"""
         self.difficulty = level
-        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
         self.ai = CustomChessAI(level)
-        self.difficulty_text.value = f"VIChess AI: {difficulty_names[level]}"
+
+        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
+        self.difficulty_text.value = f"AI: {difficulty_names[level]}"
         self.difficulty_text.update()
+
+        self._refresh_difficulty_buttons()
         self._new_game()
 
     def _go_home(self):

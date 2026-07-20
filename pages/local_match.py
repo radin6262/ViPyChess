@@ -8,7 +8,7 @@ import flet as ft
 import chess
 from lib.chess_board import ChessBoardUI
 from lib.chess_logic import ChessGameLogic
-from lib.widgets import GameControls, MoveHistory
+from lib.widgets import MoveHistory
 
 
 class LocalMatchPage:
@@ -20,67 +20,115 @@ class LocalMatchPage:
             self.game,
             on_move=self.on_move,
         )
-        self.status_text = None
         self.move_count_text = None
+        self.status_text = None
         self.history = None
 
     def show(self):
         """Display the local match page"""
         self.page.controls.clear()
 
-        # Back button
-        back_btn = ft.TextButton(
-            "← Back",
-            on_click=lambda e: self._go_home(),
-            style=ft.ButtonStyle(color=ft.Colors.BLUE_700),
+        # Player indicator
+        title = ft.Row(
+            [
+                ft.Text(
+                    "White",
+                    size=16,
+                    weight=ft.FontWeight.W_500,
+                    color=ft.Colors.BLUE_700,
+                ),
+                ft.Text(" vs ", size=14, color=ft.Colors.GREY_600),
+                ft.Text(
+                    "Black",
+                    size=16,
+                    weight=ft.FontWeight.W_500,
+                    color=ft.Colors.RED_700,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=4,
         )
 
-        # Player indicators
-        player_row = ft.Row([
-            ft.Text("⬆ Black", size=14, weight=ft.FontWeight.W_500),
-            ft.Container(expand=True),
-            ft.Text("⬇ White", size=14, weight=ft.FontWeight.W_500),
-        ], alignment=ft.MainAxisAlignment.CENTER)
-
-        # Status
-        self.status_text = ft.Text("White's turn", size=20, weight=ft.FontWeight.W_600)
+        # Status text
+        self.status_text = ft.Text(
+            "White's turn",
+            size=18,
+            weight=ft.FontWeight.W_500,
+            color=ft.Colors.GREY_800,
+        )
 
         # Move count
-        self.move_count_text = ft.Text("Move: 1", size=14, color=ft.Colors.GREY_700)
+        self.move_count_text = ft.Text("Move 1", size=14, color=ft.Colors.GREY_600)
 
         # Board
         board_stack = self.board_ui.create()
 
-        # Move history
-        self.history = MoveHistory()
-        history_container = self.history.create()
-
-        # Controls
-        controls = GameControls(
-            on_new_game=self._new_game,
+        # Controls row: New Game, Menu
+        controls_row = ft.Row(
+            [
+                ft.Button(
+                    content=ft.Row(
+                        [
+                            ft.Image(
+                                src="icons/refresh-cw.svg",
+                                width=18,
+                                height=18,
+                            ),
+                            ft.Text("New Game"),
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    on_click=lambda e: self._new_game(),
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                        bgcolor=ft.Colors.BLUE_100,
+                    ),
+                ),
+                ft.Button(
+                    content=ft.Row(
+                        [
+                            ft.Image(
+                                src="icons/home.svg",
+                                width=18,
+                                height=18,
+                            ),
+                            ft.Text("Menu"),
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    on_click=lambda e: self._go_home(),
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                        bgcolor=ft.Colors.GREY_200,
+                    ),
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=10,
         )
-        controls_row = controls.create()
 
-        # Layout - wrap everything in a column
+        # Main layout
         content_column = ft.Column(
             [
-                ft.Row([back_btn], alignment=ft.MainAxisAlignment.START),
-                player_row,
+                title,
                 self.status_text,
-                self.move_count_text,
+                ft.Row([self.move_count_text], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Container(height=10),
                 board_stack,
                 ft.Container(height=10),
                 controls_row,
                 ft.Container(height=10),
-                history_container,
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=5,
             scroll=ft.ScrollMode.AUTO,
         )
 
-        # Wrap in container with top padding
+        # Wrap in container with padding
         content = ft.Container(
             content=content_column,
             padding=ft.Padding(top=15),
@@ -88,6 +136,9 @@ class LocalMatchPage:
 
         self.page.add(content)
         self.page.update()
+
+        # Initially enable interaction
+        self.board_ui.set_interactive(True)
 
     def on_move(self, move: chess.Move):
         """Called after a move is made"""
@@ -103,21 +154,25 @@ class LocalMatchPage:
         if board.is_checkmate():
             winner = "Black" if board.turn == chess.WHITE else "White"
             self.status_text.value = f"Checkmate! {winner} wins!"
+            self.move_count_text.value = "Game Over"
         elif board.is_stalemate():
             self.status_text.value = "Stalemate! It's a draw!"
+            self.move_count_text.value = "Draw"
         elif board.is_insufficient_material():
             self.status_text.value = "Draw! Insufficient material."
+            self.move_count_text.value = "Draw"
         elif board.can_claim_threefold_repetition():
             self.status_text.value = "Draw! Threefold repetition."
+            self.move_count_text.value = "Draw"
         elif board.can_claim_fifty_moves():
             self.status_text.value = "Draw! 50-move rule."
+            self.move_count_text.value = "Draw"
         else:
             turn = "White" if board.turn == chess.WHITE else "Black"
             self.status_text.value = f"{turn}'s turn"
-
-        half_moves = len(board.move_stack)
-        full_moves = half_moves // 2 + 1
-        self.move_count_text.value = f"Move: {full_moves}"
+            half_moves = len(board.move_stack)
+            full_moves = half_moves // 2 + 1
+            self.move_count_text.value = f"Move {full_moves}"
 
         self.history.update(board.move_stack)
         self.board_ui.update()
@@ -192,19 +247,19 @@ class LocalMatchPage:
         else:
             return
 
-        # Get move count
         half_moves = len(board.move_stack)
         full_moves = half_moves // 2 + 1
 
-        # Build the dialog content
         dialog_content = ft.Column([
+            icon,
+            ft.Container(height=10),
             ft.Text(
-                f"{icon} {title}",
+                title,
                 size=32,
                 weight=ft.FontWeight.BOLD,
                 color=color,
             ),
-            ft.Container(height=10),
+            ft.Container(height=5),
             ft.Text(
                 message,
                 size=18,
@@ -218,17 +273,41 @@ class LocalMatchPage:
             ),
             ft.Container(height=15),
             ft.Row([
-                ft.ElevatedButton(
-                    "New Game",
+                ft.Button(
+                    content=ft.Row(
+                        [
+                            ft.Image(
+                                src="icons/refresh-cw.svg",
+                                width=18,
+                                height=18,
+                            ),
+                            ft.Text("New Game"),
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
                     on_click=lambda e: self._close_dialog_and_new_game(),
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
                         bgcolor=ft.Colors.BLUE_100,
                     ),
                 ),
-                ft.ElevatedButton(
-                    "Close",
-                    on_click=lambda e: self._close_dialog(),
+                ft.Button(
+                    content=ft.Row(
+                        [
+                            ft.Image(
+                                src="icons/home.svg",
+                                width=18,
+                                height=18,
+                            ),
+                            ft.Text("Menu"),
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    on_click=lambda e: self._close_dialog_and_go_home(),
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
                         bgcolor=ft.Colors.GREY_200,
@@ -237,7 +316,6 @@ class LocalMatchPage:
             ], alignment=ft.MainAxisAlignment.CENTER, spacing=10),
         ])
 
-        # Create and show the dialog using show_dialog
         dialog = ft.AlertDialog(
             modal=True,
             content=dialog_content,
@@ -257,11 +335,17 @@ class LocalMatchPage:
         self._close_dialog()
         self._new_game()
 
+    def _close_dialog_and_go_home(self):
+        """Close dialog and go home"""
+        self._close_dialog()
+        self._go_home()
+
     def _new_game(self):
         """Reset the game"""
         self.game.reset()
         self.board_ui.reset()
         self.history.clear()
+        self.board_ui.set_interactive(True)
         self._update_ui()
 
     def _go_home(self):
