@@ -26,8 +26,8 @@ class MinimaxSearch:
         self.pv_move = None
         self.best_move = None
 
-        # Transposition table
-        TranspositionTable(200000)
+        # Transposition table / 200k
+        self.tt = TranspositionTable(max_entries=200000)
 
         # Null-move pruning
         self.null_move_enabled = True

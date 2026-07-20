@@ -58,10 +58,10 @@ class ChessBoardUI:
         # Colors
         self.light_color = ft.Colors.WHITE
         self.dark_color = ft.Colors.BROWN_600
-        self.selected_color = ft.Colors.YELLOW_400
+        self.selected_color = ft.Colors.YELLOW
         self.highlight_color = ft.Colors.GREEN_300
         self.check_color = ft.Colors.RED_300
-        self.last_move_color = ft.Colors.YELLOW_600
+        self.last_move_color = ft.Colors.YELLOW_300
 
         # Layers
         self.board_stack = None
