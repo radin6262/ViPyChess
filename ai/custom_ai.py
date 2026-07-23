@@ -23,8 +23,8 @@ class CustomChessAI:
         self.depth_map = {
             1: 2,
             2: 3,
-            3: 4,
-            4: 5,
+            3: 5,
+            4: 10,
         }
         self.depth = self.depth_map.get(difficulty, 3)
         self.name = "VIChess AI"
@@ -66,11 +66,11 @@ class CustomChessAI:
     def get_difficulty_name(self) -> str:
         names = {
             1: "Easy (Depth 2)",
-            2: "Medium (Depth 3)",
-            3: "Hard (Depth 4)",
-            4: "Expert (Depth 5)",
+            2: "Normal (Depth 3)",
+            3: "Hard (Depth 5)",
+            4: "Expert (Depth 10)",
         }
-        return names.get(self.difficulty, "Medium (Depth 3)")
+        return names.get(self.difficulty, "Normal (Depth 3)")
 
     def get_stats(self) -> dict:
         return {

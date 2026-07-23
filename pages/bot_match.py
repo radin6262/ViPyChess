@@ -86,7 +86,7 @@ class BotMatchPage:
         # Move count + difficulty (no status text)
         self.move_count_text = ft.Text("Move 1", size=14, color=ft.Colors.GREY_600)
 
-        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
+        difficulty_names = {1: "Easy", 2: "Normal", 3: "Hard", 4: "Expert"}
         self.difficulty_text = ft.Text(
             f"AI: {difficulty_names[self.difficulty]}",
             size=14,
@@ -106,7 +106,7 @@ class BotMatchPage:
 
         # Difficulty buttons
         self.difficulty_buttons = {}
-        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
+        difficulty_names = {1: "Easy", 2: "Normal", 3: "Hard", 4: "Expert"}
 
         difficulty_buttons_row = ft.Row(
             [],
@@ -482,7 +482,7 @@ class BotMatchPage:
         self.difficulty = level
         self.ai = CustomChessAI(level)
 
-        difficulty_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Expert"}
+        difficulty_names = {1: "Easy", 2: "Normal", 3: "Hard", 4: "Expert"}
         self.difficulty_text.value = f"AI: {difficulty_names[level]}"
         self.difficulty_text.update()
 
