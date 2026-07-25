@@ -3,6 +3,7 @@ Minimax search with alpha-beta pruning, quiescence, and advanced search features
 """
 
 import time
+import random
 import chess
 from ai.evaluation import evaluate_board
 from ai.openings import get_opening_move
@@ -26,6 +27,16 @@ class MinimaxSearch:
         self.pv_move = None
         self.best_move = None
 
+        # randomness code
+        self.randomness_margin = {
+            1: 100,  # Easy
+            2: 50,  # Normal
+            3: 20,  # Hard
+            4: 5,  # Expert
+        }.get(depth, 20)
+
+        self.max_random_candidates = 3
+
         # Transposition table / 200k
         self.tt = TranspositionTable(max_entries=200000)
 
@@ -39,6 +50,7 @@ class MinimaxSearch:
         self.lmr_reduction = 1
 
     def search(self, board: chess.Board) -> chess.Move | None:
+        root_move_scores = {}
         """Find the best move using iterative deepening"""
         if board.is_game_over():
             return None
@@ -100,6 +112,8 @@ class MinimaxSearch:
                     start_time,
                     0
                 )
+                if current_depth == self.depth:
+                    root_move_scores[move] = score
 
                 if board.turn == chess.WHITE:
                     if score > best_score:
@@ -123,6 +137,43 @@ class MinimaxSearch:
             # Store in transposition table
             flag = TranspositionTable.FLAG_EXACT
             self.tt.store(board, current_depth, best_score, flag, self.best_move)
+
+        # ---------------------------------------------------------
+        # Controlled randomness
+        # ---------------------------------------------------------
+        # Only consider moves that are close to the best move.
+        # This prevents the AI from making obvious bad moves,
+        # while allowing different games to play differently.
+        if root_move_scores:
+            if board.turn == chess.WHITE:
+                best_score = max(root_move_scores.values())
+
+                candidates = [
+                    move
+                    for move, score in root_move_scores.items()
+                    if score >= best_score - self.randomness_margin
+                ]
+            else:
+                best_score = min(root_move_scores.values())
+
+                candidates = [
+                    move
+                    for move, score in root_move_scores.items()
+                    if score <= best_score + self.randomness_margin
+                ]
+
+            # Sort candidates by strength
+            candidates.sort(
+                key=lambda move: root_move_scores[move],
+                reverse=(board.turn == chess.WHITE),
+            )
+
+            # Only allow the best few moves
+            candidates = candidates[:self.max_random_candidates]
+
+            # Randomly select between similarly strong moves
+            if len(candidates) > 1:
+                self.best_move = random.choice(candidates)
 
         return self.best_move
 

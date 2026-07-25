@@ -376,39 +376,63 @@ class ChessBoardUI:
 
         # Handle pawn promotion
         if (
-            moving
-            and moving.piece_type == chess.PAWN
-            and chess.square_rank(square) in (0, 7)
+                moving
+                and moving.piece_type == chess.PAWN
+                and chess.square_rank(square) in (0, 7)
         ):
+            # A promotion move must include a promotion piece.
+            # Check if any legal promotion exists for this destination.
+            is_legal_promotion = any(
+                legal_move.from_square == self.selected_square
+                and legal_move.to_square == square
+                and legal_move.promotion is not None
+                for legal_move in self.game.board.legal_moves
+            )
+
+            # The pawn cannot legally move to this square.
+            if not is_legal_promotion:
+                self.selected_square = None
+                self._update_highlights()
+                return
+
+            # The promotion is legal, so show the promotion picker.
             self.pending_promotion_from = self.selected_square
             self.pending_promotion_to = square
             self._show_promotion_overlay()
             return
 
-        if move in self.game.board.legal_moves:
-            from_sq = self.selected_square
-            self.selected_square = None
-
-            # Check if this is a castling move
-            if self.game.board.is_castling(move):
-                rook_move = self._get_castling_rook_move(from_sq, square)
-                if rook_move:
-                    rook_from, rook_to = rook_move
-                    self.page.run_task(
-                        self._animate_castling_and_push,
-                        from_sq,
-                        square,
-                        rook_from,
-                        rook_to,
-                        move,
-                    )
-                    return
-
-            # Normal move
-            self.page.run_task(self._animate_and_move, from_sq, square, move)
-        else:
+        # Check normal move legality
+        if move not in self.game.board.legal_moves:
             self.selected_square = None
             self._update_highlights()
+            return
+
+        # Move is legal
+        from_sq = self.selected_square
+        self.selected_square = None
+
+        # Check if this is a castling move
+        if self.game.board.is_castling(move):
+            rook_move = self._get_castling_rook_move(from_sq, square)
+            if rook_move:
+                rook_from, rook_to = rook_move
+                self.page.run_task(
+                    self._animate_castling_and_push,
+                    from_sq,
+                    square,
+                    rook_from,
+                    rook_to,
+                    move,
+                )
+                return
+
+        # Normal move
+        self.page.run_task(
+            self._animate_and_move,
+            from_sq,
+            square,
+            move,
+        )
 
     def _show_promotion_overlay(self):
         """Show promotion picker overlay on the board (Lichess style)"""
@@ -518,7 +542,26 @@ class ChessBoardUI:
         # -------------------------------
         # Handle capture
         # -------------------------------
+        captured = None
+        captured_sq = to_sq
+
+        # Normal capture
         captured = self._get_piece_at(to_sq)
+
+        # En passant capture
+        # The destination square is empty, but the pawn being captured
+        # is directly behind the destination square.
+        if (
+                moving_piece.piece.piece_type == chess.PAWN
+                and self.game.board.is_en_passant(move)
+        ):
+            if moving_piece.piece.color == chess.WHITE:
+                captured_sq = to_sq - 8
+            else:
+                captured_sq = to_sq + 8
+
+            captured = self._get_piece_at(captured_sq)
+
         if captured:
             captured.set_opacity(0)
             self.piece_layer.update()
@@ -527,8 +570,8 @@ class ChessBoardUI:
             if captured.control in self.piece_layer.controls:
                 self.piece_layer.controls.remove(captured.control)
 
-            if to_sq in self.piece_map:
-                del self.piece_map[to_sq]
+            if captured_sq in self.piece_map:
+                del self.piece_map[captured_sq]
 
             captured.is_captured = True
             self.piece_layer.update()

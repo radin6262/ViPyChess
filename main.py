@@ -3,7 +3,7 @@ from pages.home_page import HomePage
 
 
 def main(page: ft.Page):
-    page.title = "♚ VIChess ♔"
+    page.title = "VIChess - Github"
     page.theme_mode = ft.ThemeMode.LIGHT
 
     page.padding = 8

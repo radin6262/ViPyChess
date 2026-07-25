@@ -119,7 +119,7 @@ class HomePage:
                     ft.Container(height=50),
 
                     ft.Text(
-                        "v3.3 - Ai Tweaks • Utilizing VIRender and VIUI",
+                        "v3.4 - Improvements • Utilizing VIRender and VIUI",
                         size=13,
                         color=ft.Colors.GREY_500,
                     ),
