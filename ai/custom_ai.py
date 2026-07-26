@@ -20,72 +20,42 @@ class CustomChessAI:
 
     def __init__(self, difficulty: int = 2):
         self.difficulty = difficulty
-
         self.depth_map = {
             1: 2,
             2: 3,
             3: 5,
             4: 10,
         }
-
         self.depth = self.depth_map.get(difficulty, 3)
         self.name = "VIChess AI"
         self.search = MinimaxSearch(depth=self.depth)
         self.nodes_searched = 0
-
-        # How close another move must be to the best move
-        # before it can be randomly selected.
-        self.randomness_margin = {
-            1: 100,  # Easy
-            2: 50,   # Medium
-            3: 20,   # Hard
-            4: 5,    # Expert
-        }.get(difficulty, 50)
 
     def choose_move(self, board: chess.Board) -> chess.Move | None:
         if board.is_game_over():
             return None
 
         moves = list(board.legal_moves)
-
         if len(moves) == 1:
             return moves[0]
 
-        # Minimax still chooses the strongest move.
-        # Randomness should ideally be handled inside MinimaxSearch
-        # by selecting between moves with similar scores.
         move = self.search.search(board)
-
         self.nodes_searched = self.search.nodes_searched
 
         if move is None and moves:
             safe_moves = []
-
             for m in moves:
                 board_copy = board.copy()
                 board_copy.push(m)
-
                 if not board_copy.is_check():
                     safe_moves.append(m)
 
             if safe_moves:
-                center_squares = [
-                    chess.E4,
-                    chess.D4,
-                    chess.E5,
-                    chess.D5,
-                ]
-
-                center_moves = [
-                    m for m in safe_moves
-                    if m.to_square in center_squares
-                ]
-
+                center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
+                center_moves = [m for m in safe_moves if m.to_square in center_squares]
                 if center_moves:
                     return random.choice(center_moves)
-
                 return random.choice(safe_moves)
-
             return random.choice(moves)
 
         return move
@@ -100,11 +70,7 @@ class CustomChessAI:
             3: "Hard (Depth 5)",
             4: "Expert (Depth 10)",
         }
-
-        return names.get(
-            self.difficulty,
-            "Normal (Depth 3)"
-        )
+        return names.get(self.difficulty, "Normal (Depth 3)")
 
     def get_stats(self) -> dict:
         return {
