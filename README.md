@@ -10,7 +10,7 @@
   - Check and checkmate
   - Stalemate
   - Castling
-  - En passant(coming soon)
+  - En passant(Proper Support Added in 3.4)
   - Pawn promotion with piece selection
   - Draw detection:
     - Threefold repetition
